@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name     = 'EGOCache'
+  s.name     = 'EGOCache-PPTV'
   s.version  = '2.0.1'
   s.license  = 'MIT'
   s.summary  = 'Fast Caching for Objective-C (iPhone & Mac Compatible).'
