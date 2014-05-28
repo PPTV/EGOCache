@@ -30,6 +30,8 @@
 #import <UIKit/UIKit.h>
 #endif
 
+extern NSString * const EGOCacheClearCacheFinishedNotification;
+
 @interface EGOCache : NSObject
 
 + (instancetype)currentCache __deprecated; // Renamed to globalCache
@@ -40,12 +42,14 @@
 // Opitionally create a different EGOCache instance with it's own cache directory
 - (id)initWithCacheDirectory:(NSString*)cacheDirectory;
 
+- (unsigned long long)getSize;
 - (void)clearCache;
 - (void)removeCacheForKey:(NSString*)key;
 
 - (BOOL)hasCacheForKey:(NSString*)key;
 
 - (NSData*)dataForKey:(NSString*)key;
+- (NSData*)quickDataForKey:(NSString*)key;
 - (void)setData:(NSData*)data forKey:(NSString*)key;
 - (void)setData:(NSData*)data forKey:(NSString*)key withTimeoutInterval:(NSTimeInterval)timeoutInterval;
 

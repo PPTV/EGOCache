@@ -34,6 +34,8 @@ return; }
 #define CHECK_FOR_EGOCACHE_PLIST() if([key isEqualToString:@"EGOCache.plist"]) return;
 #endif
 
+NSString * const EGOCacheClearCacheFinishedNotification = @"EGOCacheClearCacheFinishedNotification";
+
 static inline NSString* cachePathForKey(NSString* directory, NSString* key) {
 	return [directory stringByAppendingPathComponent:key];
 }
@@ -64,6 +66,7 @@ static inline NSString* cachePathForKey(NSString* directory, NSString* key) {
 	static dispatch_once_t onceToken;
 	dispatch_once(&onceToken, ^{
 		instance = [[[self class] alloc] init];
+		[instance setDefaultTimeoutInterval:86400];
 	});
 	
 	return instance;
@@ -125,20 +128,44 @@ static inline NSString* cachePathForKey(NSString* directory, NSString* key) {
 	return self;
 }
 
-- (void)clearCache {
-	dispatch_sync(_cacheInfoQueue, ^{
-		for(NSString* key in _cacheInfo) {
-			[[NSFileManager defaultManager] removeItemAtPath:cachePathForKey(_directory, key) error:NULL];
-		}
-		
-		[_cacheInfo removeAllObjects];
-		
-		dispatch_sync(_frozenCacheInfoQueue, ^{
-			self.frozenCacheInfo = [_cacheInfo copy];
-		});
+- (unsigned long long)getSize
+{
+    unsigned long long size = 0;
+    NSDirectoryEnumerator *fileEnumerator = [[NSFileManager defaultManager] enumeratorAtPath:_directory];
+    for (NSString *fileName in fileEnumerator) {
+        NSString *filePath = [_directory stringByAppendingPathComponent:fileName];
+        NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:filePath error:nil];
+        size += [attrs fileSize];
+    }
+    return size;
+     
+}
 
-		[self setNeedsSave];
-	});
+- (void)clearCache {
+    dispatch_queue_t clearQueue = dispatch_queue_create("com.enormego.egocache.clear", DISPATCH_QUEUE_SERIAL);
+    
+    dispatch_async(clearQueue, ^{
+        dispatch_sync(_cacheInfoQueue, ^{            
+            for(NSString* key in _cacheInfo) {
+                [[NSFileManager defaultManager] removeItemAtPath:cachePathForKey(_directory, key) error:NULL];
+            }
+            
+            [_cacheInfo removeAllObjects];
+            
+            dispatch_sync(_frozenCacheInfoQueue, ^{
+                self.frozenCacheInfo = [_cacheInfo copy];
+            });
+            
+            [self setNeedsSave];
+            
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [[NSNotificationCenter defaultCenter] postNotificationName:EGOCacheClearCacheFinishedNotification
+                                                                    object:nil
+                                                                  userInfo:nil];
+            });
+        });
+    });    
+
 }
 
 - (void)removeCacheForKey:(NSString*)key {
@@ -262,11 +289,20 @@ static inline NSString* cachePathForKey(NSString* directory, NSString* key) {
 }
 
 - (NSData*)dataForKey:(NSString*)key {
+    /*
 	if([self hasCacheForKey:key]) {
 		return [NSData dataWithContentsOfFile:cachePathForKey(_directory, key) options:0 error:NULL];
 	} else {
 		return nil;
 	}
+    */
+    
+    return [NSData dataWithContentsOfFile:cachePathForKey(_directory, key) options:0 error:NULL];
+}
+
+- (NSData *)quickDataForKey:(NSString *)key
+{    
+    return [NSData dataWithContentsOfFile:cachePathForKey(_directory, key) options:0 error:NULL];
 }
 
 #pragma mark -
